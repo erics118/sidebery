@@ -3,7 +3,7 @@
   # ! not maintained by @mbnuqw - report issues here: https://github.com/onezoomin/sidebery/issues
   
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     systems.url = "github:nix-systems/default";
     devenv.url = "github:cachix/devenv";
   };

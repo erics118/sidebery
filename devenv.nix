@@ -3,8 +3,8 @@
   # ! not maintained by @mbnuqw - report issues here: https://github.com/onezoomin/sidebery/issues
 
   languages.javascript = {
-    enable = true; # adds node LTS & npm
-    # package = pkgs.nodejs-18_x; <- if you need to override npm version
+    enable = true; # adds node & npm
+    package = pkgs.nodejs_22; # pin to Node 22 LTS (was Node 18 via nixos-22.11)
   };
 
   packages = with pkgs; [
