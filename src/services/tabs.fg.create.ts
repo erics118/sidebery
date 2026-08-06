@@ -525,13 +525,21 @@ export async function open(
 
 export async function reopenInContainer(ids: ID[], containerId: string) {
   Tabs.sortTabIds(ids)
-  const firstTab = Tabs.byId[ids[0]]
+  const items = Tabs.getTabsInfo(ids).filter(item => {
+    // Firefox does not allow privileged about: pages to be opened in a container.
+    // Keep them open instead of replacing them with Sidebery's URL placeholder.
+    if (item.url?.startsWith('about:') && !item.url.startsWith('about:reader?url=')) {
+      Logs.warn('Tabs.reopenInContainer: Cannot reopen a privileged about: page:', item.url)
+      return false
+    }
+    return true
+  })
+  const firstTab = Tabs.byId[items[0]?.id]
   if (!firstTab) return
 
   const idsMap: Record<ID, ID> = {}
   IPC.bg('disableAutoReopening', containerId, 1000)
 
-  const items = Tabs.getTabsInfo(ids)
   setURLsFromTitles(items)
   const rule = Tabs.findMoveRuleBy(containerId, firstTab.lvl)
   const panel = Sidebar.panelsById[rule?.panelId ?? D.NOID]
