@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "browser_specific_settings": {
     "gecko": {
-      "id": "{3c078156-979c-498b-8990-85f7987dd929}",
+      "id": "sidebery-fork@erics118",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
         "required": [
