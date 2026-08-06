@@ -18,6 +18,20 @@ describe('Utils.createGroupUrl()', () => {
   })
 })
 
+describe('Utils internal page URL detection', () => {
+  test('does not depend on the extension ID length', () => {
+    const origin = 'moz-extension://sidebery-fork@erics118'
+    expect(Utils.isGroupUrl(origin + '/sidebery/group.html#name')).toBe(true)
+    expect(Utils.isPlaceholderUrl(origin + '/sidebery/url.html#_data')).toBe(true)
+  })
+
+  test('distinguishes groups from placeholders', () => {
+    const origin = 'moz-extension://sidebery-fork@erics118'
+    expect(Utils.isGroupUrl(origin + '/sidebery/url.html#_data')).toBe(false)
+    expect(Utils.isPlaceholderUrl(origin + '/sidebery/group.html#name')).toBe(false)
+  })
+})
+
 describe('Utils.createPlaceholderUrl(), Utils.parsePlaceholderUrl()', () => {
   test('encode decode', () => {
     const srcUrl = encodeURI('file:///path/to some/filе.pdf')

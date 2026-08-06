@@ -522,10 +522,19 @@ export async function parseDragEvent(
 }
 
 export function isGroupUrl(url: string): boolean {
-  return url.startsWith('m') && url.startsWith('/sidebery/group.html', 52)
+  return isInternalPageUrl(url, D.GROUP_PATH)
 }
 export function isPlaceholderUrl(url: string): boolean {
-  return url.startsWith('m') && url.startsWith('/sidebery/url.html', 52)
+  return isInternalPageUrl(url, D.PLACEHOLDER_PATH)
+}
+
+function isInternalPageUrl(url: string, path: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'moz-extension:' && parsed.pathname === path
+  } catch {
+    return false
+  }
 }
 
 export function createGroupUrl(name?: string, pinUrl?: string, pinCtr?: string): string {
