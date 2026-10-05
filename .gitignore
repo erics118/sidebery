@@ -8,6 +8,5 @@ build/*
 !build/*.ts
 !build/*.js
 !build/*.mjs
-/.devenv/
 /.direnv/
 .idea
