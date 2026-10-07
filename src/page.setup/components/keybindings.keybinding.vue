@@ -29,12 +29,13 @@ import * as Keybindings from 'src/services/keybindings.fg'
 const ERR_SHOW_TIMEOUT = 2000
 
 // firefox maps 'Ctrl' to the command key on macos, 'MacCtrl' is the real control key
+// listed in the standard macos display order
 const MAC_KEYS: Record<string, string> = {
-  Ctrl: '⌘',
-  Command: '⌘',
   MacCtrl: '⌃',
   Alt: '⌥',
   Shift: '⇧',
+  Ctrl: '⌘',
+  Command: '⌘',
 }
 
 const inputEl = ref<HTMLInputElement | null>(null)
@@ -66,10 +67,10 @@ function changeKeybinding(cmd: Command): void {
 function normalizeShortcut(s?: string): string {
   if (!s) return '---'
   if (Info.reactive.os === 'mac') {
-    return s
-      .split('+')
-      .map(key => MAC_KEYS[key] ?? key)
-      .join('')
+    const keys = s.split('+')
+    const mods = Object.keys(MAC_KEYS).filter(key => keys.includes(key))
+    const rest = keys.filter(key => !MAC_KEYS[key])
+    return [...mods.map(key => MAC_KEYS[key]), ...rest].join('')
   }
   if (Info.reactive.os === 'win') return s.replace('Command', 'Win')
   if (Info.reactive.os === 'linux') return s.replace('Command', 'Super')
