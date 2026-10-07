@@ -74,6 +74,10 @@ export class MTab implements Tab {
   favImgEl?: HTMLImageElement | undefined
   favSvgUseEl?: SVGElement | undefined
   flashFxEl?: HTMLElement | undefined
+  stickyTitleEl?: HTMLElement
+  stickyFavImgEl?: HTMLImageElement
+  stickyFavSvgUseEl?: SVGElement
+  stickyFlashFxEl?: HTMLElement
   checkingSessionRestore?: Promise<boolean> | undefined
   resolveSessionRestoreDetection?: ((isSessionRestore: boolean) => void) | undefined
   active: boolean = false
@@ -109,6 +113,7 @@ export class MTab implements Tab {
   badgeUrgent: boolean = false
   lastActivity?: number | undefined
   urgentTabIds?: Set<ID> | undefined
+  el?: HTMLElement | undefined
 
   constructor(ptab?: Partial<Tab>) {
     if (ptab) {

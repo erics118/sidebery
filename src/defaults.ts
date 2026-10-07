@@ -70,12 +70,13 @@ export const BTN_ICONS: Record<string, string> = {
   add_tp: 'icon_add_tabs_panel',
   search: 'icon_search',
   collapse: 'icon_collapse_all',
+  expand: 'icon_expand_all',
   create_snapshot: 'icon_snapshot',
   remute_audio_tabs: 'icon_mute',
 }
 
 export const LOCALHOST_RE = /^localhost(:\d+)?/
-export const DOMAIN_RE = /^[0-9A-Za-z-]{1,63}:\/\/(?:www\.)?(.*?)(\/|$)/
+export const HOSTNAME_RE = /^[0-9A-Za-z-]{1,63}:\/\/(?:www\.)?(.*?)(?:\/|$)/
 export const LINUX_HOME_RE = /^\/home\/(.+?)\//
 export const PATH_SEP_RE = /\/|\\/
 export const RE_STR_RE = /^\/(?<re>.*)\/(?<flags>[dgimsuvy]{1,8})?$/

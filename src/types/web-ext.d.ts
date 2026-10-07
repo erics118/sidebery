@@ -386,7 +386,7 @@ declare namespace browser {
       attention?: boolean
       audible?: boolean
       discarded?: boolean
-      favIconUrl?: string
+      favIconUrl?: string | null
       groupId?: ID
       hidden?: boolean
       isArticle?: boolean
@@ -669,11 +669,23 @@ declare namespace browser {
       icon?: string
     }
 
+    interface ColorInfo {
+      color: string
+      colorCode: string
+    }
+
+    interface IconInfo {
+      icon: string
+      iconUrl: string
+    }
+
     function query(details: QueryDetails): Promise<Container[]>
     function get(id: string): Promise<Container>
     function create(details: CreateDetails): Promise<Container>
     function update(id: string, details: UpdateDetails): Promise<Container>
     function remove(id: string): Promise<Container>
+    function getSupportedColors(): Promise<ColorInfo[]>
+    function getSupportedIcons(): Promise<IconInfo[]>
 
     interface ChangeInfo {
       contextualIdentity: Container
@@ -1172,14 +1184,7 @@ declare namespace browser {
     }
 
     type DangerType =
-      | 'file'
-      | 'url'
-      | 'content'
-      | 'uncommon'
-      | 'host'
-      | 'unwanted'
-      | 'safe'
-      | 'accepted'
+      'file' | 'url' | 'content' | 'uncommon' | 'host' | 'unwanted' | 'safe' | 'accepted'
 
     type InterruptReason =
       // File-related errors:
@@ -1452,5 +1457,18 @@ declare namespace browser {
 
     function getRedirectURL(): string
     function launchWebAuthFlow(details: LaunchWebAuthDetails): Promise<string>
+  }
+
+  namespace publicSuffix {
+    type DomainEncoding = 'punycode' | 'display'
+    interface GetDomainOptions {
+      encoding?: DomainEncoding
+      allowIPAddress?: boolean
+      allowPlainSuffix?: boolean
+      allowUnknownSuffix?: boolean
+    }
+    function getDomain(hostname: string, options?: GetDomainOptions): string | null
+    function getKnownSuffix(hostname: string): string | null
+    function isKnownSuffix(hostname: string): boolean
   }
 }

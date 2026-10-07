@@ -140,7 +140,7 @@ function updateRootTree() {
   const panel = props.bookmarksPanel
   let folder = Bookmarks.byId.get(panel.rootId)
   if (folder) {
-    for (let i = panel.reactive.rootOffset; i-- && folder; ) {
+    for (let i = panel.reactive.rootOffset; i-- && folder;) {
       if (folder.parentId === BKM_ROOT_ID) {
         folder = undefined
         break
@@ -152,6 +152,7 @@ function updateRootTree() {
   state.rootFolderId = folder?.id ?? BKM_ROOT_ID
   state.rootFolderTitle = folder?.title ?? rootTitle
 
+  panel.bookmarks = folder?.children ?? Bookmarks.tree
   panel.reactive.bookmarkIds = folder?.getChildrenIds() ?? Bookmarks.reactive.root
 }
 

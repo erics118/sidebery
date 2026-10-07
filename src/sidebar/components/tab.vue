@@ -1,6 +1,7 @@
 <template lang="pug">
 .Tab(
-  :id="'tab' + tab.id"
+  ref="tabEl"
+  :id="(sticky ? 'stickytab' : 'tab') + tab.id"
   :data-pin="!!iconOnly"
   :data-active="tab.reactive.active"
   :data-loading="tab.reactive.status === TabStatus.Loading"
@@ -34,43 +35,56 @@
     .color-layer(v-if="tabColor" :style="{ '--tab-color': tabColor }")
     .flash-fx(ref="flashFxEl")
     .unread-mark(v-if="tab.reactive.unread")
-    .fav(@dragstart.stop.prevent)
-      img.fav-icon(ref="favImgEl" @error="onError" draggable="false")
-      svg.fav-icon: use(ref="favSvgUseEl" href="#icon_ff")
-      .exp(
-        v-if="tab.reactive.isParent"
-        @dblclick.prevent.stop
-        @mousedown.stop="onExpandMouseDown"
-        @mouseup="onExpandMouseUp")
-        svg.exp-icon: use(href="#icon_expand")
-      .badge(
-        v-if="tab.reactive.badge || tab.reactive.badgeUrgent"
-        :data-urgent="tab.reactive.badgeUrgent"
-        :style="{ '--bg': tab.reactive.badgeBg ?? '', '--fg': tab.reactive.badgeFg ?? '' }")
-        template(v-if="tab.reactive.badge !== true") {{tab.reactive.badge}}
-      .pending-mark
-      .progress-spinner(v-if="Settings.state.animations")
-      svg.progress-spinner(v-else): use(href="#icon_hourglass")
-      .child-count(v-if="tab.reactive.folded && tab.reactive.branchLen") {{tab.reactive.branchLen}}
-    .audio(
-      v-if="tab.reactive.mediaAudible || tab.reactive.mediaMuted || tab.reactive.mediaPaused"
-      @mousedown.stop.prevent="onAudioMouseDown($event, tab)"
-      @mouseup.stop="onAudioMouseUp($event, tab)")
-      svg.audio-icon.-loud: use(href="#icon_loud_badge")
-      svg.audio-icon.-mute: use(href="#icon_mute_badge")
-      svg.audio-icon.-pause: use(href="#icon_pause_12")
-    .t-box(v-if="!iconOnly")
-      input.custom-title-input(
-        v-if="tab.reactive.customTitleEdit"
-        :value="tab.customTitle"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false"
-        tabindex="-1"
-        @blur="onCustomTitleBlur"
-        @keydown="onCustomTitlteKD")
-      .title(ref="titleEl") {{tab.customTitle ?? tab.title}}
+    .main-row
+      .fav(@dragstart.stop.prevent)
+        img.fav-icon(ref="favImgEl" @error="onImgFavError" draggable="false")
+        svg.fav-icon: use(ref="favSvgUseEl" href="#icon_ff")
+        .exp(
+          v-if="tab.reactive.isParent"
+          @dblclick.prevent.stop
+          @mousedown.stop="onExpandMouseDown"
+          @mouseup="onExpandMouseUp")
+          svg.exp-icon: use(href="#icon_expand")
+        .badge(
+          v-if="tab.reactive.badge || tab.reactive.badgeUrgent"
+          :data-urgent="tab.reactive.badgeUrgent"
+          :style="{ '--bg': tab.reactive.badgeBg ?? '', '--fg': tab.reactive.badgeFg ?? '' }")
+          template(v-if="tab.reactive.badge !== true") {{tab.reactive.badge}}
+        .pending-mark
+        .progress-spinner(v-if="Settings.state.animations")
+        svg.progress-spinner(v-else): use(href="#icon_hourglass")
+        .child-count(v-if="tab.reactive.folded && tab.reactive.branchLen") {{tab.reactive.branchLen}}
+      .audio(
+        v-if="tab.reactive.mediaAudible || tab.reactive.mediaMuted || tab.reactive.mediaPaused"
+        @mousedown.stop.prevent="onAudioMouseDown($event, tab)"
+        @mouseup.stop="onAudioMouseUp($event, tab)")
+        svg.audio-icon.-loud: use(href="#icon_loud_badge")
+        svg.audio-icon.-mute: use(href="#icon_mute_badge")
+        svg.audio-icon.-pause: use(href="#icon_pause_12")
+      .t-box(v-if="!iconOnly")
+        template(v-if="tab.reactive.customTitleEdit")
+          input.custom-title-input(
+            v-if="!Settings.tabsMultiLineTitle"
+            :value="tab.customTitle"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            tabindex="-1"
+            @blur="onCustomTitleBlur"
+            @keydown="onCustomTitlteKD")
+          textarea.custom-title-input(
+            v-else
+            :value="tab.customTitle"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            tabindex="-1"
+            @scroll.passive="onCustomTitleScroll"
+            @blur="onCustomTitleBlur"
+            @keydown="onCustomTitlteKD")
+        .title(ref="titleEl") {{tab.customTitle ?? tab.title}}
     .close(
       v-if="!iconOnly && Settings.state.tabRmBtn !== 'none'"
       draggable="true"
@@ -83,7 +97,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, useTemplateRef, onUnmounted } from 'vue'
 import type { DragInfo, DragItem, Tab } from 'src/types'
 import { TabStatus, DragType, DropType, MenuType } from 'src/enums'
 import * as Settings from 'src/services/settings'
@@ -100,7 +114,7 @@ import * as Utils from 'src/utils'
 import * as Logs from 'src/services/logs'
 import * as Preview from 'src/services/tabs.fg.preview'
 
-const props = defineProps<{ tabId: ID }>()
+const props = defineProps<{ tabId: ID; sticky?: boolean }>()
 const tab = Tabs.byId[props.tabId] as Tab
 const iconOnly =
   tab.pinned &&
@@ -108,10 +122,11 @@ const iconOnly =
     Settings.state.pinnedTabsPosition === 'left' ||
     Settings.state.pinnedTabsPosition === 'right')
 
-const titleEl = ref<HTMLElement | null>(null)
-const favImgEl = ref<HTMLImageElement | null>(null)
-const favSvgUseEl = ref<SVGElement | null>(null)
-const flashFxEl = ref<HTMLElement | null>(null)
+const tabEl = useTemplateRef('tabEl')
+const titleEl = useTemplateRef('titleEl')
+const favImgEl = useTemplateRef('favImgEl')
+const favSvgUseEl = useTemplateRef('favSvgUseEl')
+const flashFxEl = useTemplateRef('flashFxEl')
 
 const tabColor = computed<string>(() => {
   if (tab.reactive.customColor) return RGB_COLORS[tab.customColor as browser.ColorName]
@@ -129,6 +144,15 @@ const tabColor = computed<string>(() => {
 })
 
 onMounted(() => {
+  if (props.sticky) {
+    if (titleEl.value) tab.stickyTitleEl = titleEl.value
+    if (favImgEl.value) tab.stickyFavImgEl = favImgEl.value
+    if (favSvgUseEl.value) tab.stickyFavSvgUseEl = favSvgUseEl.value
+    if (flashFxEl.value) tab.stickyFlashFxEl = flashFxEl.value
+    if (tab.url !== 'about:blank') Tabs.renderStickyFavicon(tab, false)
+    return
+  }
+
   if (titleEl.value) tab.titleEl = titleEl.value
   if (favImgEl.value) tab.favImgEl = favImgEl.value
   if (favSvgUseEl.value) tab.favSvgUseEl = favSvgUseEl.value
@@ -136,6 +160,21 @@ onMounted(() => {
 
   if (tab.url !== 'about:blank') {
     Tabs.renderFavicon(tab)
+  }
+  if (!props.sticky) {
+    tab.el = tabEl.value ?? undefined
+    if (tab.el) tab.el.__sdbr_tabId = tab.id
+  }
+
+  if (!Sidebar.tabMinHeight) Sidebar.recalcMinTabHeight()
+})
+
+onUnmounted(() => {
+  if (props.sticky) {
+    tab.stickyTitleEl = undefined
+    tab.stickyFavImgEl = undefined
+    tab.stickyFavSvgUseEl = undefined
+    tab.stickyFlashFxEl = undefined
   }
 })
 
@@ -444,10 +483,13 @@ function onMouseUp(e: MouseEvent): void {
       Settings.state.tabMiddleClick === 'close' &&
       sameTargetType
     ) {
-      if (!Selection.isSet()) select()
-      let selectedTabs = Selection.ids()
-      if (selectedTabs.length === 1 && preselectedTabs?.length) selectedTabs = preselectedTabs
-      Tabs.removeTabs(selectedTabs)
+      if (Selection.isSet()) {
+        let selectedTabs = Selection.ids()
+        if (selectedTabs.length === 1 && preselectedTabs?.length) selectedTabs = preselectedTabs
+        Tabs.removeTabs(selectedTabs)
+      } else {
+        Tabs.removeTabs([tab.id])
+      }
     }
   } else if (e.button === 2) {
     if (e.ctrlKey || e.shiftKey) return
@@ -615,7 +657,7 @@ function onMouseEnter(e: MouseEvent) {
   }
 
   if (Settings.state.previewTabs) {
-    Preview.setTargetTab(tab.id)
+    Preview.setTargetTab(tab.id, props.sticky)
   } else if (!Settings.state.forceUpdTooltip) {
     updateTooltipDebounced()
   }
@@ -738,13 +780,40 @@ function onExpandMouseUp(e: MouseEvent): void {
   }
 }
 
-function onError(): void {
+function onImgFavError(): void {
+  if (props.sticky) {
+    Tabs.renderStickyFavicon(tab, true)
+    return
+  }
   tab.favIconUrl = undefined
   Tabs.renderFavicon(tab)
 }
 
+let scrollFrameId: number | undefined
+let mlttadown = false
+function onCustomTitleScroll(e: Event) {
+  if (scrollFrameId !== undefined) return
+
+  scrollFrameId = requestAnimationFrame(() => {
+    scrollFrameId = undefined
+    if (!tabEl.value) return
+    const titleInputEl = e.target as HTMLInputElement
+    if (mlttadown && titleInputEl.scrollTop === 0) {
+      mlttadown = false
+      tabEl.value.classList.remove('-mlttadown')
+    } else if (!mlttadown) {
+      mlttadown = true
+      tabEl.value.classList.add('-mlttadown')
+    }
+  })
+}
+
 function onCustomTitleBlur(e: Event) {
   const titleInputEl = e.target as HTMLInputElement
+  tabEl.value?.classList.remove('-mlttadown')
+  if (scrollFrameId) cancelAnimationFrame(scrollFrameId)
+  scrollFrameId = undefined
+  mlttadown = false
 
   Tabs.setEditableTabId(NOID)
   tab.customTitle = titleInputEl.value

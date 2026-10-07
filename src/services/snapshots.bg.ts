@@ -89,7 +89,7 @@ export async function createSnapshot(auto = false): Promise<Snapshot | undefined
       // Check container
       if (snapTab.containerId) {
         const containerConf = stored.containers[snapTab.containerId]
-        if (!containerConf) delete snapTab.containerId
+        if (!containerConf) snapTab.containerId = undefined
       }
 
       // Pinned tabs
@@ -480,6 +480,9 @@ async function openWindow(
   await Windows.createWithTabs(items, { incognito: incognito })
 }
 
+const sizeCalcBuffer = new Uint8Array(MAX_SIZE_LIMIT * 1024 + 4)
+const sizeCalcEncoder = new TextEncoder()
+
 function limitSnapshots(snapshots: Snapshot[]): Snapshot[] | undefined {
   if (snapshots.length <= MIN_LIMITING_COUNT) return
 
@@ -506,7 +509,7 @@ function limitSnapshots(snapshots: Snapshot[]): Snapshot[] | undefined {
     const snapshot = snapshots[index]
     if (!snapshot) continue
 
-    sizeAccum += new Blob([JSON.stringify(snapshot)]).size
+    sizeAccum += sizeCalcEncoder.encodeInto(JSON.stringify(snapshot), sizeCalcBuffer).written
 
     if (unit === 'snap') {
       accum++

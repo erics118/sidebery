@@ -158,3 +158,152 @@ file:///some/path/to/File%20Name.json
     expect(items.length).toBe(4)
   })
 })
+
+describe('Utils.getDomain()', () => {
+  test('empty string', () => {
+    browser.publicSuffix = {} as unknown as typeof browser.publicSuffix
+    browser.publicSuffix.getDomain = () => {
+      throw 'invalid hostname blablabla'
+    }
+    browser.publicSuffix.getKnownSuffix = () => {
+      throw 'invalid hostname blablabla'
+    }
+    expect(Utils.getDomain('', true, -1)).toBe('')
+    expect(Utils.getDomain('', true, 0)).toBe('')
+    expect(Utils.getDomain('', true, 1)).toBe('')
+    expect(Utils.getDomain('', true, 2)).toBe('')
+    expect(Utils.getDomain('', false, -1)).toBe('')
+    expect(Utils.getDomain('', false, 0)).toBe('')
+    expect(Utils.getDomain('', false, 1)).toBe('')
+    expect(Utils.getDomain('', false, 2)).toBe('')
+    // Fallback test
+    browser.publicSuffix = undefined as unknown as typeof browser.publicSuffix
+    expect(Utils.getDomain('', true, -1)).toBe('')
+    expect(Utils.getDomain('', true, 0)).toBe('')
+    expect(Utils.getDomain('', true, 1)).toBe('')
+    expect(Utils.getDomain('', true, 2)).toBe('')
+    expect(Utils.getDomain('', false, -1)).toBe('')
+    expect(Utils.getDomain('', false, 0)).toBe('')
+    expect(Utils.getDomain('', false, 1)).toBe('')
+    expect(Utils.getDomain('', false, 2)).toBe('')
+  })
+  test('abc.sub.example.co.uk', () => {
+    browser.publicSuffix = {} as unknown as typeof browser.publicSuffix
+    browser.publicSuffix.getDomain = () => 'example.co.uk'
+    browser.publicSuffix.getKnownSuffix = () => 'co.uk'
+    const hostname = 'abc.sub.example.co.uk'
+    expect(Utils.getDomain(hostname, true, -1)).toBe('abc.sub.example.co.uk')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('co.uk')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('example.co.uk')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('sub.example.co.uk')
+    expect(Utils.getDomain(hostname, true, 4)).toBe('abc.sub.example.co.uk')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('abc.sub.example')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('example')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('sub.example')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('abc.sub.example')
+    expect(Utils.getDomain(hostname, false, 4)).toBe('abc.sub.example')
+    // Fallback test
+    browser.publicSuffix = undefined as unknown as typeof browser.publicSuffix
+    expect(Utils.getDomain(hostname, true, -1)).toBe('abc.sub.example.co.uk')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('uk')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('co.uk')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('example.co.uk')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('abc.sub.example.co')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('co')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('example.co')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('sub.example.co')
+    expect(Utils.getDomain(hostname, false, 4)).toBe('abc.sub.example.co')
+    expect(Utils.getDomain(hostname, false, 5)).toBe('abc.sub.example.co')
+  })
+  test('about:config', () => {
+    browser.publicSuffix = {} as unknown as typeof browser.publicSuffix
+    browser.publicSuffix.getDomain = () => {
+      throw 'invalid hostname blablabla'
+    }
+    browser.publicSuffix.getKnownSuffix = () => {
+      throw 'invalid hostname blablabla'
+    }
+    const hostname = 'about:config'
+    expect(Utils.getDomain(hostname, true, -1)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('about:config')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('')
+    // Fallback test
+    browser.publicSuffix = undefined as unknown as typeof browser.publicSuffix
+    expect(Utils.getDomain(hostname, true, -1)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('about:config')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('about:config')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('')
+  })
+  test('com', () => {
+    browser.publicSuffix = {} as unknown as typeof browser.publicSuffix
+    browser.publicSuffix.getDomain = () => null
+    browser.publicSuffix.getKnownSuffix = () => 'com'
+    const hostname = 'com'
+    expect(Utils.getDomain(hostname, true, -1)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('com')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('')
+    // Fallback test
+    browser.publicSuffix = undefined as unknown as typeof browser.publicSuffix
+    expect(Utils.getDomain(hostname, true, -1)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 0)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 1)).toBe('com')
+    expect(Utils.getDomain(hostname, true, 2)).toBe('com')
+    expect(Utils.getDomain(hostname, false, -1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 0)).toBe('')
+    expect(Utils.getDomain(hostname, false, 1)).toBe('')
+    expect(Utils.getDomain(hostname, false, 2)).toBe('')
+    expect(Utils.getDomain(hostname, false, 3)).toBe('')
+  })
+})
+
+describe('Utils.clone()', () => {
+  test('object', () => {
+    const src = {
+      a: undefined,
+      b: null,
+      c: 123,
+      d: 'abc',
+      self: null as any,
+      arr: [0],
+      set: new Set(),
+    }
+    src.self = src
+    src.set.add('a')
+    src.set.add('b')
+    const clone = Utils.clone(src)
+    expect(clone === src).toBe(false)
+    expect(clone.a).toBe(undefined)
+    expect(clone.a === src.a).toBe(true)
+    expect(clone.b).toBe(null)
+    expect(clone.b === src.b).toBe(true)
+    expect(clone.c).toBe(123)
+    expect(clone.c === src.c).toBe(true)
+    expect(clone.d).toBe('abc')
+    expect(clone.d === src.d).toBe(true)
+    expect(clone.self === clone).toBe(true)
+    expect(clone.self === src).toBe(false)
+    expect(clone.arr === src.arr).toBe(false)
+    expect(clone.arr[0]).toBe(0)
+    expect(clone.set === src.set).toBe(false)
+    expect(clone.set.size).toBe(2)
+  })
+})

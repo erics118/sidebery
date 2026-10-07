@@ -75,7 +75,7 @@ export async function move(
     if (allInWin && tabsInfo.length > 1) return
 
     Tabs.detachTabs(tabsInfo.map(t => t.id))
-    const info = Utils.cloneArray<T.ItemInfo>(tabsInfo)
+    const info = Utils.clone(tabsInfo) as DeepMutable<T.ItemInfo>[]
     const conf = { incognito: dst.incognito, tabId: MOVEID }
     if (dst.panelId) info.forEach(t => (t.panelId = dst.panelId))
     IPC.bg('createWindowWithTabs', info, conf).finally(() => Tabs.detachingTabIds.clear())
@@ -415,7 +415,7 @@ async function moveTabsToWin(tabIds: ID[], dst: T.DstPlaceInfo): Promise<void> {
 
   let moved
   if (sidebarIsOpen) {
-    delete dst.windowChooseConf
+    dst.windowChooseConf = undefined
     moved = await IPC.sidebar(dst.windowId, 'moveTabsToThisWin', tabs, dst).catch(() => false)
   }
 
@@ -618,7 +618,7 @@ export function detachTabs(tabIds: ID[]): DetachedTabsInfo | undefined {
   const toSave: ID[] = []
   let updMediaBadges = false
 
-  for (let i = tabIds.length; i--; ) {
+  for (let i = tabIds.length; i--;) {
     const id = tabIds[i]
     const tab = Tabs.byId[id]
     if (!tab) continue
@@ -645,7 +645,7 @@ export function detachTabs(tabIds: ID[]): DetachedTabsInfo | undefined {
     }
 
     // Prepend to output array
-    detachedTabs.unshift(Utils.cloneObject(tab))
+    detachedTabs.unshift(Utils.clone(tab))
 
     // Remove from local state
     delete Tabs.byId[id]

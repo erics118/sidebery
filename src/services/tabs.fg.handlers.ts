@@ -273,8 +273,8 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
     checkIfSessionIsRestoring(tab)
     if (tab.checkingSessionRestore) {
       const sessionRestoreIsDetected = await tab.checkingSessionRestore
-      delete tab.checkingSessionRestore
-      delete tab.resolveSessionRestoreDetection
+      tab.checkingSessionRestore = undefined
+      tab.resolveSessionRestoreDetection = undefined
       if (sessionRestoreIsDetected) return
       notSessionRestore = true
     }
@@ -320,6 +320,10 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
       }
     }
     index = tab.index
+    if (panel) {
+      if (index > panel.nextTabIndex) index = panel.nextTabIndex
+      else if (index < panel.startTabIndex) index = panel.startTabIndex
+    }
     tab.openerTabId = position.parent
     if (position.unread !== undefined) tab.unread = position.unread
     delete Tabs.newTabsPosition[tab.index]
@@ -435,8 +439,8 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
       checkIfSessionIsRestoring(tab)
       if (maybeRestoredTabsDataQuerying && tab.checkingSessionRestore) {
         const sessionRestoreIsDetected = await tab.checkingSessionRestore
-        delete tab.checkingSessionRestore
-        delete tab.resolveSessionRestoreDetection
+        tab.checkingSessionRestore = undefined
+        tab.resolveSessionRestoreDetection = undefined
         if (sessionRestoreIsDetected) return
       }
     }
@@ -464,9 +468,9 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
   if (panel && tab.index !== index) {
     handleNewTabMove(tab)
   }
-  // If the prev newtab move already scheduled defer it to be sure that
+  // If the prev newtab move already scheduled, defer it to be sure that
   // sidebery consumed all batched newtab events.
-  else if (handleNewTabMoveTimeout !== undefined) {
+  else if (newTabMoveInProgress) {
     handleNewTabMove()
   }
 
@@ -659,8 +663,6 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
     deferredActivationHandling.cb = null
   }
 
-  if (panel) Tabs.decrementScrollRetainer(panel)
-
   if (attached && (tab.audible || tab.mediaPaused || tab.mutedInfo?.muted)) {
     Sidebar.updateMediaStateOfPanelDebounced(100, tab.panelId, tab)
   }
@@ -679,6 +681,7 @@ const NEW_TAB_MOVE_DELAY = 200
 let handleNewTabMoveTimeout: number | undefined
 let newTabToMove: Tab | undefined
 let waitingNewTabMove: (() => void)[] = []
+let newTabMoveInProgress = false
 
 function handleNewTabMove(newTab?: Tab) {
   // Change the target tab only if the newTab is set.
@@ -689,12 +692,14 @@ function handleNewTabMove(newTab?: Tab) {
       // Reset the previous new tab to sort all tabs
       newTabToMove = undefined
     }
-    // There is no new tab and timeout is not started
-    else if (handleNewTabMoveTimeout === undefined) {
+    // There is no new tab and no movement is in progress
+    else if (!newTabMoveInProgress) {
       // Set tab to move as this is the first new tab in a while (NEW_TAB_MOVE_DELAY)
       newTabToMove = newTab
     }
   }
+
+  newTabMoveInProgress = true
 
   clearTimeout(handleNewTabMoveTimeout)
   handleNewTabMoveTimeout = setTimeout(() => {
@@ -710,10 +715,8 @@ function handleNewTabMove(newTab?: Tab) {
     }
 
     const tab = newTabToMove
-    newTabToMove = undefined
-
     if (!tab) {
-      Tabs.sortNativeTabs()
+      Tabs.sortNativeTabs().finally(() => (newTabMoveInProgress = false))
     } else {
       tab.moving = true
       Utils.GLOBAL_QUEUE.add(browser.tabs.move, tab.id, { index: tab.index })
@@ -721,6 +724,8 @@ function handleNewTabMove(newTab?: Tab) {
           Logs.err('Tabs.handleNewTabMove: Cannot move the tab to the correct position:', err)
         })
         .finally(() => {
+          newTabMoveInProgress = false
+          newTabToMove = undefined
           tab.moving = undefined
 
           if (waitingNewTabMove.length) {
@@ -922,13 +927,18 @@ function onTabUpdated(tabId: ID, change: browser.tabs.ChangeInfo, nativeTab: Nat
     }
   }
 
-  // Handle Firefox internal favicon
-  if (change.favIconUrl?.startsWith('chrome:')) {
-    if (change.favIconUrl === 'chrome://global/skin/icons/warning.svg') {
-      tab.warn = true
-      tab.reactive.warn = true
+  // Handle favicon
+  if (change.favIconUrl !== undefined) {
+    // Ignore `null` favicon
+    if (change.favIconUrl === null) change.favIconUrl = undefined
+    // Handle Firefox internal favicon
+    else if (change.favIconUrl.startsWith('chrome:')) {
+      if (change.favIconUrl === 'chrome://global/skin/icons/warning.svg') {
+        tab.warn = true
+        tab.reactive.warn = true
+      }
+      change.favIconUrl = ''
     }
-    change.favIconUrl = ''
   }
 
   // Handle title change
@@ -1731,6 +1741,15 @@ function onTabActivated(info: browser.tabs.ActiveInfo): void {
 
   const panel = Sidebar.panelsById[tab.panelId]
   if (!Utils.isTabsPanel(panel)) return
+
+  // Update sticky tabs
+  if (Settings.stickyTabs) {
+    Tabs.calcStickyTabs(panel)
+    if (prevActive && prevActive.panelId !== panel.id) {
+      const prevPanel = Sidebar.panelsById[prevActive.panelId]
+      if (Utils.isTabsPanel(prevPanel)) Tabs.resetStickyTabs(prevPanel)
+    }
+  }
 
   // Update succession
   Tabs.updateSuccessionDebounced(0)

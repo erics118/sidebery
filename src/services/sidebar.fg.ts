@@ -129,12 +129,13 @@ export let height = 0
 export let scrollAreaRightX = 0
 export let scrollAreaLeftX = 0
 export let panelsTop = 0
-export let tabHeight = 0
 export let tabMargin = 0
+export let tabMinHeight = 0
 export let bookmarkHeight = 0
 export let folderHeight = 0
 export let separatorHeight = 0
 export let bookmarkMargin = 0
+export let transitionDurNorm = 0
 export let switchingLock = false
 export let switchOnMouseLeave = false
 export const setSwitchOnMouseLeaveState = (s: boolean) => (switchOnMouseLeave = s)
@@ -319,9 +320,6 @@ export function recalcElementSizes(): void {
   const nbmRaw = compStyle.getPropertyValue('--nav-btn-margin')
   reactive.navBtnMargin = Utils.parseCSSNum(nbmRaw.trim())[0]
 
-  const thRaw = compStyle.getPropertyValue('--tabs-height')
-  tabHeight = Utils.parseCSSNum(thRaw.trim())[0]
-
   const tmRaw = compStyle.getPropertyValue('--tabs-margin')
   tabMargin = Utils.parseCSSNum(tmRaw.trim())[0]
 
@@ -336,12 +334,25 @@ export function recalcElementSizes(): void {
 
   const bmRaw = compStyle.getPropertyValue('--bookmarks-margin')
   bookmarkMargin = Utils.parseCSSNum(bmRaw.trim())[0]
+
+  const tdNormRaw = compStyle.getPropertyValue('--d-norm')
+  const [tdNormVal, tdNormUnit] = Utils.parseCSSNum(tdNormRaw.trim())
+  transitionDurNorm = tdNormVal
+  if (tdNormUnit === 's') transitionDurNorm *= 1000
 }
 let recalcElementSizesTimeout: number | undefined
 export function recalcElementSizesDebounced(delay = 500): void {
   clearTimeout(recalcElementSizesTimeout)
   recalcElementSizesTimeout = setTimeout(recalcElementSizes, delay)
 }
+
+export function recalcMinTabHeight() {
+  const tabEl = document.getElementsByClassName('Tab')?.[0]
+  const tabCompStyle = tabEl ? getComputedStyle(tabEl) : undefined
+  const tmhRaw = tabCompStyle?.minHeight
+  tabMinHeight = tmhRaw ? Utils.parseCSSNum(tmhRaw)[0] : 0
+}
+export const recalcMinTabHeightDebounced = Utils.debounce(recalcMinTabHeight)
 
 export function recalcSidebarSize(): void {
   setTimeout(() => {
@@ -513,6 +524,8 @@ function recalcVisibleTabsInPanel(panelId: ID) {
     }
     panel.reactive.visibleTabIds = visibleTabIds
   }
+
+  if (activePanelId === panelId) requestAnimationFrame(() => Tabs.calcStickyTabs(panel))
 }
 
 export function addToVisibleTabs(panelId: ID, tab: T.Tab) {
@@ -536,6 +549,8 @@ export function addToVisibleTabs(panelId: ID, tab: T.Tab) {
   if (index === -1) return recalcVisibleTabsInPanel(panelId)
 
   panel.reactive.visibleTabIds.splice(index - invisibleShift, 0, tabId)
+
+  if (activePanelId === panelId) requestAnimationFrame(() => Tabs.calcStickyTabs(panel))
 }
 
 export function removeFromVisibleTabs(panelId: ID, tabId: ID) {
@@ -545,6 +560,8 @@ export function removeFromVisibleTabs(panelId: ID, tabId: ID) {
   const visibleTabIds = panel.reactive.visibleTabIds
   const index = visibleTabIds.indexOf(tabId)
   if (index !== -1) visibleTabIds.splice(index, 1)
+
+  if (activePanelId === panelId) requestAnimationFrame(() => Tabs.calcStickyTabs(panel))
 }
 
 const checkDiscardedTabsInPanelTimeouts = new Map<ID, number>()
@@ -604,37 +621,40 @@ export function recalcBookmarksPanels(): void {
     }
 
     panel.bookmarks = rootContent
-    panel.reactive.bookmarkIds = Bookmarks.getIds(rootContent)
+    panel.reactive.bookmarkIds = rootContent.map(n => n.id)
     panel.reactive.len = count
   }
 
   if (subPanels.bookmarks) {
     const panel = subPanels.bookmarks
-
-    let rootContent: Bookmarks.BkmNode[]
-    if (!panel.rootId || panel.rootId === D.BKM_ROOT_ID || panel.rootId === D.NOID) {
-      rootContent = Bookmarks.tree
-    } else {
-      if (panel.reactive.rootOffset > 0) {
-        let folder = Bookmarks.byId.get(panel.rootId)
-        if (folder) {
-          for (let i = panel.reactive.rootOffset; i-- && folder; ) {
-            if (folder.parentId === D.BKM_ROOT_ID) {
-              folder = undefined
-              break
-            }
-            folder = Bookmarks.byId.get(folder.parentId)
-          }
-        }
-        rootContent = folder?.children ?? Bookmarks.tree
-      } else {
-        rootContent = Bookmarks.byId.get(panel.rootId)?.children ?? []
-      }
-    }
-
-    panel.bookmarks = rootContent
-    panel.reactive.bookmarkIds = Bookmarks.getIds(rootContent)
+    panel.bookmarks = getBookmarksTreeForSubPanel(panel)
+    panel.reactive.bookmarkIds = panel.bookmarks.map(n => n.id)
   }
+}
+
+function getBookmarksTreeForSubPanel(panel: T.BookmarksPanel): Bookmarks.BkmNode[] {
+  let rootContent: Bookmarks.BkmNode[]
+  if (!panel.rootId || panel.rootId === D.BKM_ROOT_ID || panel.rootId === D.NOID) {
+    rootContent = Bookmarks.tree
+  } else {
+    if (panel.reactive.rootOffset > 0) {
+      let folder = Bookmarks.byId.get(panel.rootId)
+      if (folder) {
+        for (let i = panel.reactive.rootOffset; i-- && folder;) {
+          if (folder.parentId === D.BKM_ROOT_ID) {
+            folder = undefined
+            break
+          }
+          folder = Bookmarks.byId.get(folder.parentId)
+        }
+      }
+      rootContent = folder?.children ?? Bookmarks.tree
+    } else {
+      rootContent = Bookmarks.byId.get(panel.rootId)?.children ?? []
+    }
+  }
+
+  return rootContent
 }
 
 let panelsBoxEl: HTMLElement | undefined
@@ -707,22 +727,15 @@ export function updateBounds(): void {
 function calcTabsBounds(panel: T.TabsPanel): T.ItemBounds[] {
   // Logs.info('Sidebar.calcTabsBounds', panel.id)
   const result: T.ItemBounds[] = []
-  const th = tabHeight
   const tm = tabMargin
-  if (th === 0) return result
-  const half = th >> 1
-  const marginA = Math.floor(tm / 2)
-  const marginB = Math.ceil(tm / 2)
-  const insideA = (half >> 1) + marginB + 2
-  const insideB = (half >> 1) + marginB - 2
-
-  let overallHeight = -marginA
-  const tabs = panel?.filteredTabs ?? Tabs.list
-  const filtered = !!panel?.filteredTabs
-  for (const tab of tabs) {
-    if ((!filtered && tab.invisible) || tab.pinned) continue
-    if (tab.panelId !== panel.id) continue
-
+  const ids = panel.reactive.visibleTabIds
+  for (const id of ids) {
+    const tab = Tabs.byId[id]
+    if (!tab?.el) continue
+    const ot = tab.el.offsetTop
+    const oh = tab.el.offsetHeight - tm
+    const hh = oh >> 1
+    const hq = hh >> 1
     result.push({
       type: E.ItemBoundsType.Tab,
       id: tab.id,
@@ -731,14 +744,12 @@ function calcTabsBounds(panel: T.TabsPanel): T.ItemBounds[] {
       lvl: tab.lvl,
       folded: tab.folded,
       parent: tab.parentId,
-      start: overallHeight,
-      top: overallHeight + insideA,
-      center: overallHeight + marginA + half,
-      bottom: overallHeight + marginA + half + insideB,
-      end: overallHeight + th + tm,
+      start: ot,
+      top: ot + hq,
+      center: ot + hh,
+      bottom: ot + hh + hq,
+      end: ot + oh,
     })
-
-    overallHeight += th + tm
   }
   return result
 }
@@ -874,6 +885,7 @@ export function recalcPanels(): void {
     if (id === 'create_snapshot') continue
     if (id === 'remute_audio_tabs') continue
     if (id === 'collapse') continue
+    if (id === 'expand') continue
     if (id === 'hdn') continue
 
     const panel = panelsById[id]
@@ -901,7 +913,7 @@ function getSidebarConfig(): T.SidebarConfig {
     if (panel) panels[id] = createPanelConfigFromPanel(panel)
   }
 
-  return { panels, nav: Utils.cloneArray(reactive.nav) }
+  return { panels, nav: Utils.clone(reactive.nav) }
 }
 
 export function saveSidebar(delay?: number): Promise<void> {
@@ -938,7 +950,7 @@ export function createPanelFromConfig(config: T.PanelConfig): T.Panel | null {
   panel.reactive.iconIMG = config.iconIMG
   if (Utils.isTabsPanel(panel)) {
     panel.reactive.newTabCtx = panel.newTabCtx
-    panel.reactive.newTabBtns = Utils.cloneArray(panel.newTabBtns)
+    panel.reactive.newTabBtns = Utils.clone(panel.newTabBtns)
   } else if (Utils.isBookmarksPanel(panel)) {
     panel.reactive.viewMode = panel.viewMode
   }
@@ -949,7 +961,7 @@ export function createPanelFromConfig(config: T.PanelConfig): T.Panel | null {
 }
 
 function createPanelConfigFromPanel(srcPanel: T.Panel): T.PanelConfig {
-  srcPanel = Utils.cloneObject(srcPanel)
+  srcPanel = Utils.clone(srcPanel)
   if (Utils.isTabsPanel(srcPanel)) {
     return Utils.recreateNormalizedObject(srcPanel, D.TABS_PANEL_CONFIG)
   } else if (Utils.isBookmarksPanel(srcPanel)) {
@@ -1027,7 +1039,7 @@ async function updateSidebar(newConfig?: T.SidebarConfig): Promise<void> {
 
       if (Utils.isTabsPanel(panel)) {
         panel.reactive.newTabCtx = panel.newTabCtx
-        panel.reactive.newTabBtns = Utils.cloneArray(panel.newTabBtns)
+        panel.reactive.newTabBtns = Utils.clone(panel.newTabBtns)
       } else if (Utils.isBookmarksPanel(panel)) {
         panel.reactive.viewMode = panel.viewMode
       }
@@ -1551,7 +1563,7 @@ export function getActivePanelConfig(): T.PanelConfig | undefined {
   else if (Utils.isSyncPanel(panel)) defaults = D.SYNC_PANEL_CONFIG
   if (!defaults) return
 
-  return Utils.cloneObject(Utils.recreateNormalizedObject(panel, defaults))
+  return Utils.clone(Utils.recreateNormalizedObject(panel, defaults))
 }
 
 export async function askHowRemoveTabsPanel(panelId: ID): Promise<string | null> {
@@ -1769,7 +1781,7 @@ export function getPanelAutoName(type: E.PanelType): string | undefined {
  * Creates tabs-panel object.
  */
 export function createTabsPanel(conf?: Partial<T.TabsPanelConfig>): T.TabsPanel {
-  const panel = Utils.cloneObject(D.TABS_PANEL_STATE)
+  const panel = Utils.clone(D.TABS_PANEL_STATE)
 
   if (conf) Utils.updateObject(panel, conf, conf)
   panel.id = Utils.uid()
@@ -1780,7 +1792,7 @@ export function createTabsPanel(conf?: Partial<T.TabsPanelConfig>): T.TabsPanel 
   panel.reactive.iconSVG = panel.iconSVG
   panel.reactive.iconIMG = panel.iconIMG
   panel.reactive.newTabCtx = panel.newTabCtx
-  panel.reactive.newTabBtns = Utils.cloneArray(panel.newTabBtns)
+  panel.reactive.newTabBtns = Utils.clone(panel.newTabBtns)
   panel.reactive.tooltip = getPanelTooltip(panel)
 
   if (reactFn) panel.reactive = reactFn(panel.reactive)
@@ -1816,7 +1828,7 @@ export function getIndexForNewTabsPanel(append?: boolean): number {
  * Creates bookmarks-panel object.
  */
 export function createBookmarksPanel(conf?: Partial<T.BookmarksPanelConfig>): T.BookmarksPanel {
-  const panel = Utils.cloneObject(D.BOOKMARKS_PANEL_STATE)
+  const panel = Utils.clone(D.BOOKMARKS_PANEL_STATE)
 
   if (conf) Utils.updateObject(panel, conf, conf)
   if (!panel.id) panel.id = Utils.uid()
@@ -1842,7 +1854,6 @@ export function addPanel<T extends T.Panel>(index: number, panel: T, replace?: b
     const replaceableId = reactive.nav[index]
     if (replaceableId !== undefined) {
       if (activePanelId === replaceableId) {
-        setActivePanelId(panel.id)
         prevActivePanelId = panel.id
 
         if (Settings.updateWinPrefaceOnPanelSwitch) Windows.updWindowPreface()
@@ -2424,27 +2435,29 @@ export async function convertToBookmarksPanel(
     bookmarksPanelConfig.autoConvert = panel.srcPanelConfig.autoConvert
   }
   let bookmarksPanel = createBookmarksPanel(bookmarksPanelConfig)
-  if (panel.srcPanelConfig) bookmarksPanel.id = panel.srcPanelConfig.id
   bookmarksPanel = addPanel(index, bookmarksPanel, true)
 
   // Preserve tree state (folded/expanded folders)
   const srcTreeState = Bookmarks.reactive.expanded[panel.id]
   if (srcTreeState) {
-    Bookmarks.reactive.expanded[bookmarksPanel.id] = Utils.cloneObject(srcTreeState)
+    Bookmarks.reactive.expanded[bookmarksPanel.id] = Utils.clone(srcTreeState)
     Bookmarks.saveBookmarksTree()
   }
 
   recalcPanels()
   recalcBookmarksPanels()
+  Tabs.recalcMoveRules()
   saveSidebar(500)
 
-  setTimeout(() => {
+  if (isActive) activatePanel(bookmarksPanel.id, false)
+
+  requestAnimationFrame(() => {
     // Unlock switching panels
     switchingLock = false
 
     // Mark bookmarks panel as ready
     if (Bookmarks.tree.length) bookmarksPanel.reactive.ready = bookmarksPanel.ready = true
-  }, 200)
+  })
 
   Notifications.finishProgress(notif, 2000)
   notif.title = translate('notif.panel_conv')
@@ -2460,6 +2473,7 @@ export async function convertToTabsPanel(
   if (convertingPanelLock) return D.NOID
   convertingPanelLock = true
 
+  const isActive = activePanelId === bookmarksPanel.id
   const index = reactive.nav.indexOf(bookmarksPanel.id)
   if (index === -1) {
     convertingPanelLock = false
@@ -2508,16 +2522,16 @@ export async function convertToTabsPanel(
     tabsPanelConfig.noEmpty = bookmarksPanel.srcPanelConfig.noEmpty
     tabsPanelConfig.newTabCtx = bookmarksPanel.srcPanelConfig.newTabCtx
     tabsPanelConfig.dropTabCtx = bookmarksPanel.srcPanelConfig.dropTabCtx
-    tabsPanelConfig.moveRules = Utils.cloneArray(bookmarksPanel.srcPanelConfig.moveRules)
-    tabsPanelConfig.newTabBtns = Utils.cloneArray(bookmarksPanel.srcPanelConfig.newTabBtns)
+    tabsPanelConfig.moveRules = Utils.clone(bookmarksPanel.srcPanelConfig.moveRules)
+    tabsPanelConfig.newTabBtns = Utils.clone(bookmarksPanel.srcPanelConfig.newTabBtns)
   }
   let tabsPanel = createTabsPanel(tabsPanelConfig)
-  if (bookmarksPanel.srcPanelConfig) tabsPanel.id = bookmarksPanel.srcPanelConfig.id
   tabsPanel = addPanel(index, tabsPanel, true)
   recalcPanels()
   recalcTabsPanels()
-  activatePanel(tabsPanel.id, false)
+  Tabs.recalcMoveRules()
 
+  if (isActive) activatePanel(tabsPanel.id, false)
   if (isFirstTabsPanel) await Tabs.load()
 
   // Open tabs
@@ -2593,6 +2607,8 @@ export function openSubPanel(type: E.SubPanelType, hostPanel?: T.Panel) {
     if (!panel) {
       panel = createBookmarksPanel({ rootId: hostPanel.bookmarksFolderId })
       if (panel.rootId === D.NOID) panel.rootId = D.BKM_ROOT_ID
+      panel.bookmarks = getBookmarksTreeForSubPanel(panel)
+      panel.reactive.bookmarkIds = panel.bookmarks.map(n => n.id)
       subPanels.bookmarks = panel
     } else {
       panel.rootId = hostPanel.bookmarksFolderId

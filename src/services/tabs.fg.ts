@@ -737,7 +737,7 @@ export function cacheTabsData(delay = 300): void {
     for (const tab of Tabs.list) {
       const info: T.TabCache = { id: tab.id, url: tab.url }
       if (tab.pinned) info.pin = true
-      if (+tab.parentId > -1) info.parentId = tab.parentId
+      if ((tab.parentId as number) > -1) info.parentId = tab.parentId
       if (tab.panelId !== D.NOID) info.panelId = tab.panelId
       if (tab.folded) info.folded = tab.folded
       if (tab.cookieStoreId !== D.CONTAINER_ID) info.ctx = tab.cookieStoreId
@@ -815,14 +815,16 @@ function _saveTabData(tabId: ID, forced?: boolean): void {
       panelId: tab.panelId,
       parentId: tab.parentId,
       folded: tab.folded,
+      customTitle: undefined,
+      customColor: undefined,
     }
     tab.sessionData = data
   }
 
   if (tab.customTitle) data.customTitle = tab.customTitle
-  else delete data.customTitle
+  else data.customTitle = undefined
   if (tab.customColor) data.customColor = tab.customColor
-  else delete data.customColor
+  else data.customColor = undefined
 
   // Logs.info('Tabs.saveTabData: Saving...', tabId, { ...data })
   browser.sessions.setTabValue(tabId, 'data', data).catch(err => {
@@ -1064,7 +1066,7 @@ export function reloadTabs(tabIds: ID[] = []): void {
         return tab && tab.reloadingChecks++ <= MAX_CHECK_COUNT && tab.status === 'loading'
       })
 
-      for (let i = Settings.state.tabsReloadLimit - loading.length; i-- > 0; ) {
+      for (let i = Settings.state.tabsReloadLimit - loading.length; i-- > 0;) {
         const nextTab = RELOADING_QUEUE.shift()
         if (!nextTab) break
         reloadingTabs.push(nextTab)
@@ -1477,8 +1479,8 @@ export async function clearTabsCookies(tabIds: ID[]): Promise<void> {
     const tab = Tabs.byId[tabId]
     if (!tab) continue
 
-    const url = new URL(tab.url)
-    const domain = url.hostname.split('.').slice(-2).join('.')
+    const hostname = Utils.getHostname(tab.url)
+    const domain = Utils.getDomain(hostname, true, 1)
 
     if (!domain) {
       Notifications.notify({
@@ -1679,7 +1681,6 @@ export function foldTabsBranch(rootTabId: ID): void {
   Sidebar.recalcVisibleTabs(rootTab.panelId)
 
   rootTab.reactive.branchLen = len
-  Tabs.incrementScrollRetainer(panel, len)
 
   if (Settings.state.discardFolded) {
     Tabs.autoDiscardFolded(rootTab)
@@ -1758,7 +1759,6 @@ export function expTabsBranch(rootTabId: ID, noRecursive?: boolean, noAutoFold?:
   }
 
   if (!rootTab.invisible) Sidebar.recalcVisibleTabs(rootTab.panelId)
-  if (!rootTab.invisible && count) Tabs.decrementScrollRetainer(panel, count)
 
   // Auto fold
   if (Settings.state.autoFoldTabs) {
@@ -1839,10 +1839,18 @@ export function foldAllInactiveBranches(tabs: T.Tab[] = []): void {
     parent = Tabs.byId[parent.parentId]
   }
 
-  for (let tab, i = tabs.length; i--; ) {
+  for (let tab, i = tabs.length; i--;) {
     tab = tabs[i]
     if (tab.isParent && !tab.folded && !activeBranch.includes(tab.id)) {
       foldTabsBranch(tab.id)
+    }
+  }
+}
+
+export function expAllBranches(tabs: T.Tab[] = []): void {
+  for (const tab of tabs) {
+    if (tab.isParent && tab.folded) {
+      expTabsBranch(tab.id, true, true)
     }
   }
 }
@@ -1981,7 +1989,7 @@ export function updateTabsTree(startIndex = 0, endIndex = -1): void {
       // if prev tab is not parent and with smaller lvl
       // go back and set lvl and parentId
       if (prevTab && prevTab.id !== tab.parentId && prevTab.lvl < tab.lvl) {
-        for (let j = tab.index; j--; ) {
+        for (let j = tab.index; j--;) {
           const backTab = Tabs.list[j]
           if (backTab.id === parent.id) break
           if (backTab.panelId !== tab.panelId) break
@@ -2054,13 +2062,13 @@ export function queryTab(props: Partial<T.Tab>): T.Tab | null {
       ((p: keyof T.Tab) => t[p] === props[p]) as (p: string) => boolean
     )
   })
-  if (tab) return Utils.cloneObject(tab)
+  if (tab) return Utils.clone(tab)
   else return null
 }
 
 export function getTabs(tabIds?: ID[]): T.Tab[] | undefined {
   const tabs = tabIds ? Tabs.list.filter(t => tabIds.includes(t.id)) : Tabs.list
-  if (tabs.length) return Utils.cloneArray(tabs)
+  if (tabs.length) return Utils.clone(tabs)
 }
 
 export function getTabsTreeData(): T.TabsTreeData {
@@ -2269,7 +2277,7 @@ export function findSuccessorTab(tab: T.Tab, exclude?: readonly ID[]): T.Tab | u
         else {
           // Search in pinned tabs in current panel
           if (panel.pinnedTabs.length) {
-            for (let i = panel.pinnedTabs.length; i--; ) {
+            for (let i = panel.pinnedTabs.length; i--;) {
               const pTab = panel.pinnedTabs[i]
               if (!pTab) break
               if (skipDiscarded && pTab.discarded) {
@@ -2367,7 +2375,7 @@ export function findSuccessorTab(tab: T.Tab, exclude?: readonly ID[]): T.Tab | u
     if (!history || !history.actTabs) return
 
     let targetId, prev
-    for (let i = history.actTabs.length; i--; ) {
+    for (let i = history.actTabs.length; i--;) {
       targetId = history.actTabs[i]
       prev = Tabs.byId[targetId]
 
@@ -2753,9 +2761,11 @@ export async function paste(dst: T.DstPlaceInfo) {
 export function triggerFlashAnimation(tab: T.Tab): void {
   if (tab.flashAnimationTimeout) return
   if (tab.flashFxEl) tab.flashFxEl.setAttribute('data-run', 'true')
+  if (tab.stickyFlashFxEl) tab.stickyFlashFxEl.setAttribute('data-run', 'true')
   tab.flashAnimationTimeout = setTimeout(() => {
     tab.flashAnimationTimeout = undefined
     if (tab.flashFxEl) tab.flashFxEl.setAttribute('data-run', 'false')
+    if (tab.stickyFlashFxEl) tab.stickyFlashFxEl.setAttribute('data-run', 'false')
   }, 1000)
 }
 
@@ -2916,6 +2926,9 @@ export function renderTitle(tab: T.Tab, forcedTitle?: string) {
   if (tab.titleEl) {
     tab.titleEl.innerText = forcedTitle ?? tab.customTitle ?? tab.title
   }
+  if (tab.stickyTitleEl) {
+    tab.stickyTitleEl.innerText = forcedTitle ?? tab.customTitle ?? tab.title
+  }
   if (Settings.state.forceUpdTooltip) {
     updateTooltip(tab.id)
   }
@@ -2924,20 +2937,58 @@ export function renderTitle(tab: T.Tab, forcedTitle?: string) {
 export function renderFavicon(tab: T.Tab) {
   const imgEl = tab.favImgEl
   const svgUseEl = tab.favSvgUseEl
-  if (tab.favIconUrl && imgEl) {
+  const stickyImgEl = tab.stickyFavImgEl
+  const stickySvgUseEl = tab.stickyFavSvgUseEl
+
+  if (tab.favIconUrl) {
+    if (imgEl) {
+      // Set img
+      imgEl.src = tab.favIconUrl
+      // Show img
+      if (imgEl.style) imgEl.style.display = 'block'
+      // Hide svg
+      if (svgUseEl?.parentElement) svgUseEl.parentElement.style.display = 'none'
+    }
+    if (stickyImgEl) {
+      stickyImgEl.src = tab.favIconUrl
+      if (stickyImgEl.style) stickyImgEl.style.display = 'block'
+      if (stickySvgUseEl?.parentElement) stickySvgUseEl.parentElement.style.display = 'none'
+    }
+  } else {
+    let icon
+    if (svgUseEl?.parentElement) {
+      // Set svg
+      icon = tab.warn ? '#icon_warn' : Favicons.getFavPlaceholder(tab.url)
+      svgUseEl.setAttribute('href', icon)
+      // Show svg
+      svgUseEl.parentElement.style.display = 'block'
+      // Hide img
+      if (imgEl?.style) imgEl.style.display = 'none'
+    }
+    if (stickySvgUseEl?.parentElement) {
+      if (!icon) icon = tab.warn ? '#icon_warn' : Favicons.getFavPlaceholder(tab.url)
+      stickySvgUseEl.setAttribute('href', icon)
+      stickySvgUseEl.parentElement.style.display = 'block'
+      if (stickyImgEl?.style) stickyImgEl.style.display = 'none'
+    }
+  }
+}
+
+export function renderStickyFavicon(tab: T.Tab, placeholder: boolean) {
+  const stickyImgEl = tab.stickyFavImgEl
+  const stickySvgUseEl = tab.stickyFavSvgUseEl
+
+  if (tab.favIconUrl && stickyImgEl && !placeholder) {
     // Set img
-    imgEl.src = tab.favIconUrl
+    stickyImgEl.src = tab.favIconUrl
     // Show img
-    if (imgEl.style) imgEl.style.display = 'block'
+    if (stickyImgEl.style) stickyImgEl.style.display = 'block'
     // Hide svg
-    if (svgUseEl?.parentElement) svgUseEl.parentElement.style.display = 'none'
-  } else if (svgUseEl?.parentElement) {
-    // Set svg
+    if (stickySvgUseEl?.parentElement) stickySvgUseEl.parentElement.style.display = 'none'
+  } else if (stickySvgUseEl?.parentElement) {
     const icon = tab.warn ? '#icon_warn' : Favicons.getFavPlaceholder(tab.url)
-    svgUseEl.setAttribute('href', icon)
-    // Show svg
-    svgUseEl.parentElement.style.display = 'block'
-    // Hide img
-    if (imgEl) imgEl.style.display = 'none'
+    stickySvgUseEl.setAttribute('href', icon)
+    stickySvgUseEl.parentElement.style.display = 'block'
+    if (stickyImgEl?.style) stickyImgEl.style.display = 'none'
   }
 }

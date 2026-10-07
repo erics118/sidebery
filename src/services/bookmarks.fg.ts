@@ -158,8 +158,8 @@ class BkmNode {
         parsedTitle.slice(0, pinIndex) + parsedTitle.slice(pinIndex + 1 + D.PIN_MARK.length)
     }
 
-    delete this.containerColor
-    delete this.reactive.containerColor
+    this.containerColor = undefined
+    this.reactive.containerColor = undefined
     parsedTitle = parsedTitle.replace(D.CONTAINER_IN_BOOKMARK_RE, (match, cpid) => {
       if (typeof cpid !== 'string') return match
       const info = Containers.parseCPID(cpid)
@@ -169,8 +169,8 @@ class BkmNode {
       return ''
     })
 
-    delete this.customColor
-    delete this.reactive.customColor
+    this.customColor = undefined
+    this.reactive.customColor = undefined
     parsedTitle = parsedTitle.replace(D.COLOR_IN_BOOKMARK_RE, (match, colorId) => {
       const color = D.BOOKMARK_TAB_COLOR[colorId as string]
       if (!color) return match
@@ -314,7 +314,7 @@ class ancestorsUpdBuffer {
 
     clearTimeout(this.#timeout)
     this.#timeout = setTimeout(() => {
-      for (let i = this.#byTreeLvl.length; i--; ) {
+      for (let i = this.#byTreeLvl.length; i--;) {
         const foldersOfLvl = this.#byTreeLvl[i]
         if (!foldersOfLvl || !foldersOfLvl.size) continue
 
@@ -461,7 +461,7 @@ export function saveBookmarksTree(delay = 128): void {
 
   clearTimeout(saveBookmarksTreeTimeout)
   saveBookmarksTreeTimeout = setTimeout(() => {
-    const expandedBookmarkFolders = Utils.cloneObject(Bookmarks.reactive.expanded)
+    const expandedBookmarkFolders = Utils.clone(Bookmarks.reactive.expanded)
     Store.set({ expandedBookmarkFolders }, 500)
   }, delay)
 }
@@ -978,6 +978,18 @@ export function collapseAllBookmarks(panelId: ID): void {
 }
 
 /**
+ * Expand all bookmarks folders
+ */
+export function expandAllBookmarks(panelId: ID): void {
+  const expanded: Record<ID, boolean> = {}
+  for (const [id, node] of Bookmarks.byId) {
+    if (node.children) expanded[id] = true
+  }
+  Bookmarks.reactive.expanded[panelId] = expanded
+  saveBookmarksTree()
+}
+
+/**
  * Sort bookmarks
  */
 export async function sortBookmarks(
@@ -1135,7 +1147,7 @@ export async function createFromDragEvent(e: DragEvent, dst: T.DstPlaceInfo): Pr
         // Remove containers info b/c it's a different profile, hence containerId
         // refers to a different container.
         // TODO: tell user about this
-        delete item.container
+        item.container = undefined
 
         // Update sidebery internal urls
         if (item.url && groupUrlStartRe.test(item.url)) {

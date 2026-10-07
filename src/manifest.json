@@ -3,7 +3,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "sidebery-fork@erics118",
-      "strict_min_version": "140.0",
+      "strict_min_version": "153.0",
       "data_collection_permissions": {
         "required": [
           "none"
@@ -31,6 +31,7 @@
   "permissions": [
     "activeTab",
     "tabs",
+    "publicSuffix",
     "contextualIdentities",
     "cookies",
     "storage",

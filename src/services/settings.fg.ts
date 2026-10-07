@@ -27,7 +27,7 @@ export async function load() {
 export async function saveSettings(): Promise<void> {
   Logs.info('Settings.saveSettings')
 
-  const clone = Utils.cloneObject(Settings.state)
+  const clone = Utils.clone(Settings.state)
   const settings = Utils.recreateNormalizedObject(clone, DEFAULT_SETTINGS)
   await Store.set({ settings })
 
@@ -129,6 +129,10 @@ export function updateSettings(settings?: SettingsState | null): void {
   const markWindowPreface = prev.markWindowPreface !== next.markWindowPreface
   const tabsUnreadMark = prev.tabsUnreadMark !== next.tabsUnreadMark
   const copyTemplates = prev.copyTemplates !== next.copyTemplates
+  const stickyActiveTab = prev.stickyActiveTab !== next.stickyActiveTab
+  const stickyAncestorTabs = prev.stickyAncestorTabs !== next.stickyAncestorTabs
+  const stickyAncestorTabsLimit = prev.stickyAncestorTabsLimit !== next.stickyAncestorTabsLimit
+  const stickyAncestorTabsLayout = prev.stickyAncestorTabsLayout !== next.stickyAncestorTabsLayout
 
   // Update settings of this instance
   Utils.updateObject(Settings.state, settings, Settings.state)
@@ -229,6 +233,19 @@ export function updateSettings(settings?: SettingsState | null): void {
   if (Info.isSidebar && copyTemplates) Settings.parseCopyTemplates()
 
   Search.parseShortcuts()
+
+  if (
+    stickyActiveTab ||
+    stickyAncestorTabs ||
+    stickyAncestorTabsLimit ||
+    stickyAncestorTabsLayout
+  ) {
+    const actPanel = Sidebar.panelsById[Sidebar.activePanelId]
+    if (Utils.isTabsPanel(actPanel)) {
+      if (Settings.stickyTabs) Tabs.calcStickyTabs(actPanel)
+      else Tabs.resetStickyTabs(actPanel)
+    }
+  }
 }
 
 export function resetSettings(): void {

@@ -4,7 +4,7 @@
   :data-showed="Settings.state.searchBarMode === 'static' || Search.reactive.barIsShowed"
   :data-active="Search.reactive.popupIsShowed || Search.reactive.barIsFocused"
   :data-focused="Search.reactive.barIsFocused"
-  :data-filled="!!Search.reactive.rawQuery")
+  :data-filled="Search.reactive.barIsFilled")
   .search-icon(@mousedown.stop.prevent="" @mouseup.stop.prevent="")
     svg: use(href="#icon_search")
   .placeholder {{translate('bar.search.placeholder')}}
@@ -112,8 +112,10 @@ function onKD(e: KeyboardEvent): void {
   }
 }
 
-function onInput(e: Event) {
+function onInput(e: InputEvent) {
   const rawQuery = (e.target as HTMLInputElement | null)?.value ?? ''
+  Search.reactive.barIsFilled = !!rawQuery
+  if (e.isComposing) return
 
   if (Settings.state.searchInputTimeout > 0) {
     Search.searchDebounced(Settings.state.searchInputTimeout, rawQuery)

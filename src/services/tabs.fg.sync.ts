@@ -27,7 +27,7 @@ export async function sync(ids: ID[]) {
     if (!tab) continue
 
     const sTab: Sync.Google.SyncedTab = { id: tabId, title: tab.title, url: tab.url }
-    const domain = Utils.getDomainOf(sTab.url)
+    const domain = Utils.getHostname(sTab.url)
     const favicon = Favicons.reactive.byDomains[domain]
     if (domain) sTab.domain = domain
     if (favicon && domain) favicons[domain] = favicon
@@ -64,9 +64,9 @@ function getSyncedContainer(containerId: ID): Sync.Google.SyncedContainer | void
       color: container.color,
       icon: container.icon,
       proxified: container.proxified,
-      proxy: container.proxy ? Utils.cloneObject(container.proxy) : null,
+      proxy: container.proxy ? Utils.clone(container.proxy) : null,
       reopenRulesActive: container.reopenRulesActive,
-      reopenRules: Utils.cloneArray(container.reopenRules),
+      reopenRules: Utils.clone(container.reopenRules),
       userAgentActive: container.userAgentActive,
       userAgent: container.userAgent,
     }

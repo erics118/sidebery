@@ -113,6 +113,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   forceDiscard: true,
   tabUpdDelay: 150,
   forceUpdTooltip: false,
+  stickyActiveTab: false,
+  tabsTitleLinesMax: 1,
+  tabsTitleLinesBr: 'w',
 
   // New tab position
   moveNewTabPin: 'start',
@@ -126,7 +129,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   autoScrollToNewTab: true,
 
   // Pinned tabs
-  pinnedTabsPosition: 'panel',
+  pinnedTabsPosition: 'top',
   pinnedTabsList: false,
   pinnedAutoGroup: false,
   pinnedNoUnload: false,
@@ -136,6 +139,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   // Tabs tree
   tabsTree: true,
   tabsTreeLimit: 'none',
+  stickyAncestorTabs: false,
+  stickyAncestorTabsLimit: 3,
+  stickyAncestorTabsLayout: 'col',
   autoFoldTabs: false,
   autoFoldTabsExcept: 'none',
   autoExpandTabs: false,
@@ -227,7 +233,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   wheelAccumulationY: true,
   navSwitchPanelsDelay: 128,
   scrollThroughTabs: 'none',
-  scrollThroughTabsGlobPinIsolate: true,
+  scrollThroughTabsGlobPinIsolate: false,
   scrollThroughVisibleTabs: true,
   scrollThroughTabsSkipDiscarded: true,
   scrollThroughTabsExceptOverflow: true,
@@ -306,6 +312,7 @@ export const SETTINGS_OPTIONS = {
   ],
   navBookmarksPanelMidClickAction: ['convert', 'none'],
   tabsUrlInTooltip: ['full', 'stripped', 'none'],
+  tabsTitleLinesBr: ['w', 'c'],
   groupLayout: ['grid', 'list'],
   hScrollAction: ['switch_panels', 'switch_act_tabs', 'none'],
   scrollThroughTabs: ['panel', 'global', 'psp', 'psg', 'none'],
@@ -336,6 +343,8 @@ export const SETTINGS_OPTIONS = {
   tabsUpdateMark: ['all', 'pin', 'norm', 'none'], // DEPR
   pinnedTabsPosition: ['panel', 'top', 'left', 'right'],
   tabsTreeLimit: [1, 2, 3, 4, 5, 'none'],
+  stickyAncestorTabsLimit: [1, 2, 3, 4, 5, 'none'],
+  stickyAncestorTabsLayout: ['col', 'row'],
   previewTabsMode: ['i', 'p'],
   previewTabsPageModeFallback: ['i', 'n'],
   previewTabsSide: ['right', 'left'],

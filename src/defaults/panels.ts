@@ -86,6 +86,7 @@ export const TABS_PANEL_STATE: T.TabsPanel = {
   nextTabIndex: -1,
   scrollRetainer: 0,
   allDiscarded: false,
+  ntbbEl: null,
 
   class: E.NavItemClass.panel,
   index: -1,
@@ -115,6 +116,8 @@ export const TABS_PANEL_STATE: T.TabsPanel = {
     visibleTabIds: [],
     pinnedTabIds: [],
     badge: false,
+    stickyTabIdsTop: [],
+    stickyTabIdsBottom: [],
     selNewTab: false,
     scrollRetainerHeight: 0,
     empty: true,
@@ -214,4 +217,5 @@ export const NAV_BTNS_IDS: ID[] = [
   'create_snapshot',
   'remute_audio_tabs',
   'collapse',
+  'expand',
 ]

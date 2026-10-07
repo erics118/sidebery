@@ -32,8 +32,8 @@ Firefox extension for managing tabs and bookmarks in sidebar.
 **Stable**:
 [Release page](https://github.com/mbnuqw/sidebery/releases/latest) |
 [Addon page](https://addons.mozilla.org/firefox/addon/sidebery/) (reviewed by Mozilla)  
-**Nightly** (v5.6.0.1):
-[Install](https://github.com/mbnuqw/sidebery/releases/download/v5.6.0/sidebery-5.6.0.1.xpi)
+**Nightly** (v5.6.1.5):
+[Install](https://github.com/mbnuqw/sidebery/releases/download/v5.6.1/sidebery-5.6.1.5.xpi)
 > [!NOTE]
 > Nightly release is a signed build created via [github actions](https://github.com/mbnuqw/sidebery/actions/workflows/nightly-release.yml). It supports auto-updates and is designed for testing new features. A few previous nightly releases can be found in the Assets section of the latest [release notes](https://github.com/mbnuqw/sidebery/releases).
 >
@@ -118,6 +118,8 @@ create folder `chrome` with file `userChrome.css`.
     }
     #sidebar-box {
       padding: 0 !important;
+      border-radius: 0 !important;
+      border: none !important;
     }
     #sidebar-box #sidebar {
       box-shadow: none !important;
